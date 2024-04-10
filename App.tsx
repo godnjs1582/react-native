@@ -5,22 +5,21 @@
  * @format
  */
 
-import React from 'react';
+import React, {useEffect} from 'react';
 import {
   SafeAreaView,
   StatusBar,
   View,
   useColorScheme,
   Text,
-  Pressable,
 } from 'react-native';
 import Animated, {
-  Extrapolation,
   interpolate,
-  useAnimatedScrollHandler,
+  interpolateColor,
   useAnimatedStyle,
   useSharedValue,
 } from 'react-native-reanimated';
+import {accelerometer} from 'react-native-sensors';
 
 import {Colors} from 'react-native/Libraries/NewAppScreen';
 
@@ -37,21 +36,32 @@ function App(): React.JSX.Element {
   const backgroundStyle = {
     backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
   };
-  const value = useSharedValue(0);
+  const accelerometerValue = useSharedValue({x: 0, y: 0, z: 0});
 
-  const onScroll = useAnimatedScrollHandler(event => {
-    value.value = event.contentOffset.y;
+  useEffect(() => {
+    const subscription = accelerometer.subscribe(({x, y, z}) => {
+      accelerometerValue.value = {x, y, z};
+    });
+    return () => subscription.unsubscribe();
+  }, [accelerometerValue]);
+
+  const leftBackground = useAnimatedStyle(() => {
+    return {
+      backgroundColor: interpolateColor(
+        accelerometerValue.value.y,
+        [-1, 0],
+        ['red', 'green'],
+      ),
+    };
   });
 
-  const floatingButtonStyle = useAnimatedStyle(() => {
+  const rightBackground = useAnimatedStyle(() => {
     return {
-      transform: [
-        {
-          translateY: interpolate(value.value, [50, 100], [50, -100], {
-            extrapolateRight: Extrapolation.CLAMP,
-          }),
-        },
-      ],
+      backgroundColor: interpolateColor(
+        accelerometerValue.value.y,
+        [0, 1],
+        ['green', 'red'],
+      ),
     };
   });
 
@@ -61,40 +71,10 @@ function App(): React.JSX.Element {
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
         backgroundColor={backgroundStyle.backgroundColor}
       />
-      <Animated.FlatList
-        style={{flex: 1}}
-        onScroll={onScroll}
-        scrollEventThrottle={1}
-        data={[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}
-        renderItem={({item}) => {
-          return (
-            <View
-              style={{
-                height: 150,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-              <Text>{item}</Text>
-            </View>
-          );
-        }}
-      />
-      <Pressable style={{position: 'absolute', right: 24, bottom: 24}}>
-        <Animated.View
-          style={[
-            {
-              width: 50,
-              height: 50,
-              borderRadius: 25,
-              backgroundColor: 'red',
-              alignItems: 'center',
-              justifyContent: 'center',
-            },
-            floatingButtonStyle,
-          ]}>
-          <Text style={{color: 'white', fontSize: 24}}>+</Text>
-        </Animated.View>
-      </Pressable>
+      <View style={{flex: 1}}>
+        <Animated.View style={[{flex: 1}, leftBackground]} />
+        <Animated.View style={[{flex: 1}, rightBackground]} />
+      </View>
     </SafeAreaView>
   );
 }
